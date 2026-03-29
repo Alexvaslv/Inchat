@@ -234,32 +234,43 @@ export const UserProfileView: React.FC<{ uid: string; onBack?: () => void }> = (
   React.useEffect(() => {
     if (!uid) return;
     
-    setLoading(true);
-    // Fetch profile
-    const profileUnsubscribe = onSnapshot(doc(db, "users", uid), (snap) => {
-      if (snap.exists()) setProfile(snap.data() as UserProfile);
-    }, (error) => {
-      handleFirestoreError(error, OperationType.GET, `users/${uid}`);
-    });
-
-    // Fetch user posts
-    const qPosts = query(
-      collection(db, "posts"), 
-      where("userId", "==", uid),
-      orderBy("createdAt", "desc")
-    );
+    let unsubscribeFirestore: () => void;
     
-    const postsUnsubscribe = onSnapshot(qPosts, (snapshot) => {
-      setUserPosts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Post)));
-      setLoading(false);
-    }, (error) => {
-      handleFirestoreError(error, OperationType.LIST, "posts");
-      setLoading(false);
+    const unsubscribeAuth = auth.onAuthStateChanged((user) => {
+      if (!user) return;
+
+      setLoading(true);
+      // Fetch profile
+      const profileUnsubscribe = onSnapshot(doc(db, "users", uid), (snap) => {
+        if (snap.exists()) setProfile(snap.data() as UserProfile);
+      }, (error) => {
+        handleFirestoreError(error, OperationType.GET, `users/${uid}`);
+      });
+
+      // Fetch user posts
+      const qPosts = query(
+        collection(db, "posts"), 
+        where("userId", "==", uid),
+        orderBy("createdAt", "desc")
+      );
+      
+      const postsUnsubscribe = onSnapshot(qPosts, (snapshot) => {
+        setUserPosts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Post)));
+        setLoading(false);
+      }, (error) => {
+        handleFirestoreError(error, OperationType.LIST, "posts");
+        setLoading(false);
+      });
+
+      unsubscribeFirestore = () => {
+        profileUnsubscribe();
+        postsUnsubscribe();
+      };
     });
 
     return () => {
-      profileUnsubscribe();
-      postsUnsubscribe();
+      unsubscribeAuth();
+      if (unsubscribeFirestore) unsubscribeFirestore();
     };
   }, [uid]);
 
@@ -411,47 +422,56 @@ export const ProfileView: React.FC = () => {
   const [activeTab, setActiveTab] = React.useState<"posts" | "saved">("posts");
 
   React.useEffect(() => {
-    if (!user) return;
+    let unsubscribeFirestore: () => void;
     
-    // Fetch profile
-    const profileUnsubscribe = onSnapshot(doc(db, "users", user.uid), (snap) => {
-      if (snap.exists()) setProfile(snap.data() as UserProfile);
-    }, (error) => {
-      handleFirestoreError(error, OperationType.GET, `users/${user.uid}`);
-    });
+    const unsubscribeAuth = auth.onAuthStateChanged((user) => {
+      if (!user) return;
+      
+      // Fetch profile
+      const profileUnsubscribe = onSnapshot(doc(db, "users", user.uid), (snap) => {
+        if (snap.exists()) setProfile(snap.data() as UserProfile);
+      }, (error) => {
+        handleFirestoreError(error, OperationType.GET, `users/${user.uid}`);
+      });
 
-    // Fetch user posts
-    const qPosts = query(
-      collection(db, "posts"), 
-      where("userId", "==", user.uid),
-      orderBy("createdAt", "desc")
-    );
-    
-    const postsUnsubscribe = onSnapshot(qPosts, (snapshot) => {
-      setUserPosts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Post)));
-      setLoading(false);
-    }, (error) => {
-      handleFirestoreError(error, OperationType.LIST, "posts");
-      setLoading(false);
-    });
+      // Fetch user posts
+      const qPosts = query(
+        collection(db, "posts"), 
+        where("userId", "==", user.uid),
+        orderBy("createdAt", "desc")
+      );
+      
+      const postsUnsubscribe = onSnapshot(qPosts, (snapshot) => {
+        setUserPosts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Post)));
+        setLoading(false);
+      }, (error) => {
+        handleFirestoreError(error, OperationType.LIST, "posts");
+        setLoading(false);
+      });
 
-    // Fetch saved posts
-    const qSaved = query(
-      collection(db, `users/${user.uid}/saved`),
-      orderBy("savedAt", "desc")
-    );
-    const savedUnsubscribe = onSnapshot(qSaved, (snapshot) => {
-      setSavedPosts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    }, (error) => {
-      handleFirestoreError(error, OperationType.LIST, `users/${user.uid}/saved`);
+      // Fetch saved posts
+      const qSaved = query(
+        collection(db, `users/${user.uid}/saved`),
+        orderBy("savedAt", "desc")
+      );
+      const savedUnsubscribe = onSnapshot(qSaved, (snapshot) => {
+        setSavedPosts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      }, (error) => {
+        handleFirestoreError(error, OperationType.LIST, `users/${user.uid}/saved`);
+      });
+
+      unsubscribeFirestore = () => {
+        profileUnsubscribe();
+        postsUnsubscribe();
+        savedUnsubscribe();
+      };
     });
 
     return () => {
-      profileUnsubscribe();
-      postsUnsubscribe();
-      savedUnsubscribe();
+      unsubscribeAuth();
+      if (unsubscribeFirestore) unsubscribeFirestore();
     };
-  }, [user]);
+  }, []);
 
   const displayPosts = activeTab === "posts" ? userPosts : savedPosts;
 
