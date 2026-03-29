@@ -20,6 +20,7 @@ export const PostCard: React.FC<PostCardProps> = ({ post }) => {
   const user = auth.currentUser;
 
   React.useEffect(() => {
+    if (!auth.currentUser) return;
     // Fetch author profile for badges
     const unsubProfile = onSnapshot(doc(db, "users", post.userId), (snap) => {
       if (snap.exists()) setAuthorProfile(snap.data() as UserProfile);
@@ -27,10 +28,10 @@ export const PostCard: React.FC<PostCardProps> = ({ post }) => {
       handleFirestoreError(error, OperationType.GET, `users/${post.userId}`);
     });
 
-    if (!user) return () => unsubProfile();
     const checkState = async () => {
-      const likeRef = doc(db, `posts/${post.id}/likes/${user.uid}`);
-      const saveRef = doc(db, `users/${user.uid}/saved/${post.id}`);
+      if (!auth.currentUser) return;
+      const likeRef = doc(db, `posts/${post.id}/likes/${auth.currentUser.uid}`);
+      const saveRef = doc(db, `users/${auth.currentUser.uid}/saved/${post.id}`);
       
       const [likeSnap, saveSnap] = await Promise.all([
         getDoc(likeRef),
@@ -41,9 +42,11 @@ export const PostCard: React.FC<PostCardProps> = ({ post }) => {
       setIsSaved(saveSnap.exists());
     };
     checkState();
-  }, [post.id, user]);
+    return () => unsubProfile();
+  }, [post.id]);
 
   React.useEffect(() => {
+    if (!auth.currentUser) return;
     const q = query(
       collection(db, `posts/${post.id}/comments`),
       orderBy("createdAt", "desc"),

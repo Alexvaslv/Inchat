@@ -17,6 +17,7 @@ export const SearchView: React.FC<{ onSelectUser: (uid: string) => void }> = ({ 
   const currentUser = auth.currentUser;
 
   React.useEffect(() => {
+    if (!auth.currentUser) return;
     const q = query(collection(db, "users"));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const users = snapshot.docs.map(doc => doc.data() as UserProfile);

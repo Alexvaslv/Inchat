@@ -24,6 +24,7 @@ export const Stories: React.FC = () => {
   const user = auth.currentUser;
 
   React.useEffect(() => {
+    if (!auth.currentUser) return;
     const q = query(
       collection(db, "stories"),
       where("expiresAt", ">", new Date().toISOString()),
